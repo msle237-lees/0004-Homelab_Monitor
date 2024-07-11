@@ -1,0 +1,11 @@
+certifi==2024.7.4
+charset-normalizer==3.3.2
+enum34==1.1.10
+idna==3.7
+netifaces==0.11.0
+psutil==6.0.0
+pyspectator==1.2.2
+pyvalid==1.0.4
+requests==2.32.3
+six==1.16.0
+urllib3==2.2.2
