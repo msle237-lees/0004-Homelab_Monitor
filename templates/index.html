@@ -1,16 +1,156 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Monitor</title>
-        <link rel="stylesheet" type="text/css" href="static/css/style.css">
-    </head>
-    <body>
-        <div class="main">
-            <div class="quadrant">
-                    
-            </div>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .tab-content {
+            margin-top: 20px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mt-4">Server Dashboard</h1>
+        <!-- Nav tabs -->
+        <ul class="nav nav-tabs" id="serverTabs" role="tablist">
+            <!-- Tabs will be dynamically generated here -->
+        </ul>
+
+        <!-- Tab panes -->
+        <div class="tab-content" id="serverTabsContent">
+            <!-- Tab content will be dynamically generated here -->
         </div>
-        <script src="js/jquery-3.3.1.min.js"></script>
-        <script src="static/js/script.js"></script>
-    </body>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            fetch('/get_servers')
+                .then(response => response.json())
+                .then(data => {
+                    const serverTabs = document.getElementById('serverTabs');
+                    const serverTabsContent = document.getElementById('serverTabsContent');
+
+                    data.forEach((server, index) => {
+                        // Create tab
+                        const tab = document.createElement('li');
+                        tab.className = 'nav-item';
+                        tab.innerHTML = `
+                            <a class="nav-link ${index === 0 ? 'active' : ''}" id="server-${server.id}-tab" data-toggle="tab" href="#server-${server.id}" role="tab" aria-controls="server-${server.id}" aria-selected="${index === 0 ? 'true' : 'false'}">${server.name}</a>
+                        `;
+                        serverTabs.appendChild(tab);
+
+                        // Create tab content
+                        const tabPane = document.createElement('div');
+                        tabPane.className = `tab-pane fade ${index === 0 ? 'show active' : ''}`;
+                        tabPane.id = `server-${server.id}`;
+                        tabPane.setAttribute('role', 'tabpanel');
+                        tabPane.setAttribute('aria-labelledby', `server-${server.id}-tab`);
+                        tabPane.innerHTML = `
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="cpuUsageChart-${server.id}"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="ramUsageChart-${server.id}"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="diskUsageChart-${server.id}"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="statusChart-${server.id}"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        serverTabsContent.appendChild(tabPane);
+
+                        // Fetch and render server stats
+                        fetch(`/get_server_stats?server_id=${server.id}`)
+                            .then(response => response.json())
+                            .then(stats => {
+                                // Create charts for this server
+                                createChart(`cpuUsageChart-${server.id}`, 'CPU Usage', stats.map(s => s.cpu_usage));
+                                createChart(`ramUsageChart-${server.id}`, 'RAM Usage', stats.map(s => s.ram_usage));
+                                createChart(`diskUsageChart-${server.id}`, 'Disk Usage', stats.map(s => s.disk_usage));
+                                createPieChart(`statusChart-${server.id}`, 'Status', {
+                                    total: server.disk_space,
+                                    used: stats[stats.length - 1].disk_total - stats[stats.length - 1].disk_free,
+                                    free: stats[stats.length - 1].disk_free
+                                });
+                            });
+                    });
+                });
+
+            function createChart(canvasId, label, data) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map((_, index) => index),
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            xAxes: [{
+                                display: false
+                            }],
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: true
+                                }
+                            }]
+                        }
+                    }
+                });
+            }
+
+            function createPieChart(canvasId, label, data) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Used', 'Free'],
+                        datasets: [{
+                            label: label,
+                            data: [data.used, data.free],
+                            backgroundColor: ['rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)'],
+                            borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)'],
+                            borderWidth: 1
+                        }]
+                    }
+                });
+            }
+        });
+    </script>
+    <!-- Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+</body>
+
 </html>
