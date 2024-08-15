@@ -14,3 +14,11 @@ the port can be any port number you want
  pip3 install -r requirements_client.txt
  python3 app.py -c
 ```
+
+## Make sure to create a `config.json` file with the following contents
+```json
+{
+    "url": "http://{ip of ntfy server}:{port of ntfy server}",
+    "ntfy_subject": "{topic name}"
+}
+```

@@ -1,8 +1,11 @@
-# this file is the main running script for the application
-# Depending on the system, you may need to run this file as an administrator
-
 import argparse
-
+import os
+import logging
+from logging.handlers import SMTPHandler
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
+import datetime
+import json
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
@@ -12,11 +15,10 @@ if __name__ == '__main__':
 
     args = args.parse_args()
 
-    from flask import Flask, render_template, request, redirect, url_for, flash
-    from flask_sqlalchemy import SQLAlchemy
-
-    import datetime
-    import json
+    with open('configs/config.json', 'r') as f:
+        config = json.load(f)
+    url = config['url']
+    ntfy_subject = config['ntfy_subject']
 
     # create the flask app
     app = Flask(__name__)
@@ -24,6 +26,22 @@ if __name__ == '__main__':
     # create the database
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
     db = SQLAlchemy(app)
+
+    # Set up error logging to send errors to the ntfy server
+    class NtfyLoggingHandler(logging.Handler):
+        def emit(self, record):
+            try:
+                ntfy_message = self.format(record)
+                ntfy_server = f"{url}/{ntfy_subject}"
+                os.system(f'ntfy -d "{ntfy_message}" {ntfy_server}')
+            except Exception:
+                self.handleError(record)
+
+    ntfy_handler = NtfyLoggingHandler()
+    ntfy_handler.setLevel(logging.ERROR)
+    ntfy_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+    app.logger.addHandler(ntfy_handler)
 
     # Create the database tables
     class Servers(db.Model):
@@ -145,7 +163,23 @@ if __name__ == '__main__':
         db.session.delete(server)
         db.session.commit()
         return redirect(url_for('get_servers'))
-
+    
+    @app.route('/delete_server_stat', methods=['POST'])
+    def delete_server_stat():
+        server_stat_id = request.form['server_stat_id']
+        server_stat = ServerStats.query.get(server_stat_id)
+        db.session.delete(server_stat)
+        db.session.commit()
+        return redirect(url_for('get_server_stats'))
+    
+    @app.route('/send_warning', methods=['POST'])
+    def send_warning():
+        ntfy_server = url + ntfy_subject
+        server_id = request.form['server_id']
+        server = Servers.query.get(server_id)
+        os.system(f'ntfy -d "{server_id} WARNING - {server.name} - {server.ip} - {server.port} - {server.status} - {server.last_updated} - {server.cpu_type} - {server.cpu_cores} - {server.ram} - {server.disk_space}" {ntfy_server}')
+        return 201
+    
     @app.route('/')
     def index():
         return render_template('index.html')
