@@ -33,7 +33,7 @@ if __name__ == '__main__':
             try:
                 ntfy_message = self.format(record)
                 ntfy_server = f"{url}/{ntfy_subject}"
-                os.system(f'ntfy -d "{ntfy_message}" {ntfy_server}')
+                os.system(f'curl -d "{ntfy_message}" {ntfy_server}')
             except Exception:
                 self.handleError(record)
 
